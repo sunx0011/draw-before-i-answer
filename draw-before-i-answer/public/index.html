@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#faf8f3">
+<title>Draw Before I Answer</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header id="bar" hidden>
+    <a href="/" class="brand">Draw Before I Answer</a>
+    <span id="codeChip" class="chip"></span>
+  </header>
+
+  <p id="offline" class="notice" hidden>Your partner seems disconnected. They can come back by reopening the room link on the same device. The game will wait.</p>
+
+  <!-- 1. Home -->
+  <section id="home" class="view center">
+    <h1>Draw Before<br>I Answer</h1>
+    <p class="lead">Two players. Each asks a question. Each draws the answer to the other's, and then the AI answers both.</p>
+    <div class="stack">
+      <button id="createBtn" class="btn primary">Create Room</button>
+      <button id="showJoinBtn" class="btn secondary">Join Room</button>
+    </div>
+    <form id="joinForm" class="stack" hidden>
+      <input id="joinInput" class="input code" placeholder="Room code or link" autocomplete="off" autocapitalize="characters">
+      <button class="btn primary" type="submit">Join</button>
+      <button id="backBtn" class="link" type="button">Back</button>
+    </form>
+    <p id="homeError" class="error"></p>
+  </section>
+
+  <!-- 2. Waiting room -->
+  <section id="waiting" class="view center" hidden>
+    <p class="label">Room code</p>
+    <p id="bigCode" class="bigcode"></p>
+    <p id="shareLink" class="muted break"></p>
+    <button id="copyBtn" class="btn primary wide">Copy invite link</button>
+    <p class="big">Waiting for another player…</p>
+  </section>
+
+  <!-- 3. Ask -->
+  <section id="ask" class="view" hidden>
+    <form id="askForm" class="stack">
+      <h2>Your question</h2>
+      <p class="muted">Your partner will see it after you both ask.</p>
+      <textarea id="askInput" class="input" placeholder="Ask me anything..." maxlength="300" rows="4"></textarea>
+      <button id="askBtn" class="btn primary" type="submit" disabled>Ask</button>
+    </form>
+    <p id="askWait" class="big" hidden>Waiting for your partner…</p>
+  </section>
+
+  <!-- 4. Draw -->
+  <section id="draw" class="view" hidden>
+    <h2>Before I answer yours, answer theirs. Draw it!</h2>
+    <p class="label">Their question</p>
+    <p id="theirQuestion" class="question"></p>
+    <canvas id="canvas" width="800" height="800" aria-label="Drawing canvas"></canvas>
+    <div id="tools">
+      <div class="row">
+        <button id="penBtn" class="tool on">✏️ Pen</button>
+        <button id="eraserBtn" class="tool">Eraser</button>
+        <button id="clearBtn" class="tool">Clear</button>
+      </div>
+      <button id="submitDrawBtn" class="btn primary" disabled>Submit Drawing</button>
+    </div>
+    <p id="drawWait" class="big" hidden>Waiting for your partner…</p>
+  </section>
+
+  <!-- between drawing and reveal -->
+  <section id="revealing" class="view center" hidden>
+    <h2>Both drawings are in!</h2>
+    <p class="muted big-ish">Getting your answers…</p>
+  </section>
+
+  <!-- 5. Reveal -->
+  <section id="reveal" class="view" hidden>
+    <p id="demoBanner" class="demo" hidden>DEMO ANSWER MODE: no AI key is set, so answers are placeholders.</p>
+    <article class="card">
+      <p class="label">You asked</p>
+      <p id="rMyQ" class="question"></p>
+      <p class="label">Your partner drew</p>
+      <img id="rDrawForMe" class="drawing" alt="">
+      <p class="label ai-label">AI answer</p>
+      <p id="rMyA" class="answer"></p>
+    </article>
+    <article class="card small">
+      <p class="label">They asked</p>
+      <p id="rTheirQ" class="question"></p>
+      <p class="label">You drew</p>
+      <img id="rMyDraw" class="drawing" alt="">
+      <p class="label ai-label">AI answer</p>
+      <p id="rTheirA" class="answer"></p>
+    </article>
+    <button id="againBtn" class="btn primary">Play Again</button>
+  </section>
+
+  <!-- messages -->
+  <section id="connecting" class="view center" hidden><p class="muted big-ish">Connecting…</p></section>
+  <section id="fatal" class="view center" hidden>
+    <h2>Can't join this room</h2>
+    <p id="fatalMsg" class="muted"></p>
+    <a href="/" class="btn primary">Back home</a>
+  </section>
+  <p id="error" class="error"></p>
+</main>
+<script src="app.js"></script>
+</body>
+</html>

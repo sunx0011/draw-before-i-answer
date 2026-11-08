@@ -1,0 +1,9 @@
+{
+  "name": "draw-before-i-answer",
+  "version": "1.0.0",
+  "description": "DRAW BEFORE I ANSWER: two-player online drawing game (Node + WebSocket, same setup as TRICK OR CUFF)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" }
+}
