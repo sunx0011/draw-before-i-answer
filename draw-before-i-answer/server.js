@@ -179,9 +179,18 @@ function handleJoin(ws, m) {
   else {
     const taken = new Set([...room.players.values()].map(q => q.slot));
     const slot = [1, 2].find(s => !taken.has(s));
-    if (!slot) return fail(ws, 'full', 'This room already has two players.');
-    p = { id: crypto.randomUUID(), token: crypto.randomBytes(16).toString('hex'), slot, ws: null, connected: false, lastSeen: Date.now() };
-    room.players.set(p.id, p);
+    if (slot) {
+      p = { id: crypto.randomUUID(), token: crypto.randomBytes(16).toString('hex'), slot, ws: null, connected: false, lastSeen: Date.now() };
+      room.players.set(p.id, p);
+    } else {
+      // Both seats are taken. If one of them is offline (tab closed, phone locked, a different
+      // browser or device), this visitor takes that seat over, keeping whatever it already submitted,
+      // so closing a tab never locks a player out of their own room.
+      const seat = [...room.players.values()].filter(q => !q.connected).sort((a, b) => a.lastSeen - b.lastSeen)[0];
+      if (!seat) return fail(ws, 'full', 'This room already has two players online.');
+      seat.token = crypto.randomBytes(16).toString('hex'); // the old saved token stops working
+      p = seat;
+    }
   }
   p.ws = ws; p.connected = true; p.lastSeen = Date.now();
   ws.player = p; ws.room = room;
@@ -197,6 +206,6 @@ setInterval(() => {
   for (const room of rooms.values()) {
     if ([...room.players.values()].every(p => !p.connected && p.lastSeen < cutoff)) rooms.delete(room.code);
   }
-}, 15000);
+}, 5000); // notice dropped connections within ~10 s so their seat frees up quickly
 
 server.listen(PORT, () => console.log(`DRAW BEFORE I ANSWER running on http://localhost:${PORT}  (AI: ${aiMode()})`));
