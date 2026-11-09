@@ -2,6 +2,7 @@ services:
   - type: web
     name: draw-before-i-answer
     runtime: node
+    rootDir: draw-before-i-answer
     plan: free
     buildCommand: npm install
     startCommand: npm start
