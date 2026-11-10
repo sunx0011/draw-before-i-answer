@@ -35,26 +35,54 @@ const server = http.createServer((req, res) => {
 
 // ---------------- AI (server only; key never reaches the browser) ----------------
 const SYSTEM = 'You answer questions inside a playful two-player drawing game. Answer in 1-3 short, friendly, clear sentences. No markdown.';
+// Demo answers (used when no AI key is set, or if the AI call fails): classic lines from
+// Renwu Zhi, Shakespeare, Schopenhauer's "The Wisdom of Life" and the Analects of Confucius.
 const DEMO = [
-  'Honestly? It depends on the snacks involved.',
-  'The short answer is yes. The long answer is also yes, but slower.',
-  'Scientists are still arguing about it, but a cat would say no.',
-  'Probably a duck. It is usually a duck.',
-  'Ask again after a nap and the answer gets clearer.',
+  // Renwu Zhi (Treatise on Personalities), Liu Shao
+  'At the root of every person lie their feelings and nature. — Renwu Zhi',
+  "Of all a sage's gifts, none beats clear insight; and the best use of insight is knowing people. — Renwu Zhi",
+  'Of all human qualities, balance is the most precious. — Renwu Zhi',
+  'The finest flower of the grass is called brilliant; the strongest beast of the herd is called heroic. — Renwu Zhi',
+  'Wisdom to plan the start, sight to seize the moment, courage to decide: that makes a hero. — Renwu Zhi',
+  // Shakespeare
+  "Shall I compare thee to a summer's day? — Shakespeare, Sonnet 18",
+  'To thine own self be true. — Shakespeare, Hamlet',
+  "All the world's a stage. — Shakespeare, As You Like It",
+  'The course of true love never did run smooth. — Shakespeare',
+  'There is nothing either good or bad, but thinking makes it so. — Shakespeare, Hamlet',
+  // Schopenhauer, The Wisdom of Life
+  'The two foes of human happiness are pain and boredom. — Schopenhauer',
+  'Riches are like sea-water; the more you drink the thirstier you become. — Schopenhauer',
+  'A healthy beggar is happier than an ailing king. — Schopenhauer',
+  'What a man is contributes much more to his happiness than what he has. — Schopenhauer',
+  'In solitude, what a man has in himself comes to light. — Schopenhauer',
+  // The Analects of Confucius
+  'Is it not a joy to learn something and practice it often? — Confucius',
+  'When three people walk together, one of them can be my teacher. — Confucius',
+  "To know what you know and admit what you don't: that is knowledge. — Confucius",
+  'Do not do to others what you would not want done to yourself. — Confucius',
+  'Time flows on like this river, never stopping, day or night. — Confucius',
 ];
-const demoAnswer = q => DEMO[[...q].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0) % DEMO.length];
+// random line, skipping any in `avoid` (the other player's answer, this player's last one)
+function pickDemo(avoid = []) {
+  const pool = DEMO.filter(d => !avoid.some(a => a && a.includes(d)));
+  const list = pool.length ? pool : DEMO;
+  return list[crypto.randomInt(list.length)];
+}
 const aiMode = () => (process.env.ANTHROPIC_API_KEY ? 'anthropic' : process.env.OPENAI_API_KEY ? 'openai' : 'demo');
 
-async function askAI(question) {
+async function askAI(question, avoid = []) {
   const mode = aiMode();
-  if (mode === 'demo') return { text: demoAnswer(question), demo: true };
+  if (mode === 'demo') return { text: pickDemo(avoid), demo: true };
+  // each player gets their own answer, written for them
+  const prompt = question + '\n\n(This answer is just for the player who asked this question. Make it feel personal to them.)';
   try {
     const ctrl = AbortSignal.timeout(25000);
     if (mode === 'anthropic') {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST', signal: ctrl,
         headers: { 'content-type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-        body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5', max_tokens: 250, system: SYSTEM, messages: [{ role: 'user', content: question }] }),
+        body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || 'claude-haiku-5-5', max_tokens: 250, system: SYSTEM, messages: [{ role: 'user', content: prompt }] }),
       });
       if (!r.ok) throw new Error('Anthropic ' + r.status + ' ' + (await r.text()));
       const d = await r.json();
@@ -65,7 +93,7 @@ async function askAI(question) {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST', signal: ctrl,
       headers: { 'content-type': 'application/json', authorization: 'Bearer ' + process.env.OPENAI_API_KEY },
-      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', max_tokens: 250, messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: question }] }),
+      body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4o-mini', max_tokens: 250, messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: prompt }] }),
     });
     if (!r.ok) throw new Error('OpenAI ' + r.status + ' ' + (await r.text()));
     const d = await r.json();
@@ -74,7 +102,7 @@ async function askAI(question) {
     return { text, demo: false };
   } catch (err) {
     console.error('AI request failed:', err.message);
-    return { text: '(The AI request failed, so here is a demo answer.) ' + demoAnswer(question), demo: true };
+    return { text: '(The AI request failed, so here is a demo answer.) ' + pickDemo(avoid), demo: true };
   }
 }
 
@@ -113,8 +141,12 @@ async function finishRound(room) {
   room.stage = 'revealing';
   pushState(room);
   const round = room.round;
-  const [a1, a2] = await Promise.all([askAI(room.subs[1].question), askAI(room.subs[2].question)]);
+  const last = room.lastAnswers || {};
+  const [a1, a2] = await Promise.all([askAI(room.subs[1].question, [last[1]]), askAI(room.subs[2].question, [last[2]])]);
   if (!rooms.has(room.code) || room.round !== round) return; // room gone or moved on
+  // the two players never get the same demo answer
+  if (a2.demo && a1.text === a2.text) a2.text = (a2.text.startsWith('(') ? '(The AI request failed, so here is a demo answer.) ' : '') + pickDemo([a1.text, last[2]]);
+  room.lastAnswers = { 1: a1.text, 2: a2.text };
   Object.assign(room.subs[1], { answer: a1.text, demo: a1.demo });
   Object.assign(room.subs[2], { answer: a2.text, demo: a2.demo });
   room.stage = 'reveal';
